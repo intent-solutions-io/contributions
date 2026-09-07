@@ -293,6 +293,32 @@ EOF
   [ "$(sev)" = "PASS" ]
 }
 
+@test "c41 large early-match evidence stays deterministic under pipefail" {
+  mkdir -p "$TREE/bin" "$TREE/tests"
+  cat > "$TREE/bin/descriptor-reader" <<'EOF'
+#!/usr/bin/perl
+use Fcntl qw(O_NOFOLLOW O_NONBLOCK O_RDONLY);
+my $root = $ENV{XDG_STATE_HOME};
+sysopen(my $fh, "$root/state", O_RDONLY | O_NONBLOCK | O_NOFOLLOW);
+EOF
+  cat > "$TREE/tests/state.test.js" <<'EOF'
+// Hostile lifecycle evidence: final, temp, parent, FIFO, oversized.
+EOF
+  # Put every decisive token before more than a pipe buffer of inert evidence.
+  # The old printf | grep -q shape intermittently treated grep's successful
+  # early exit plus printf's SIGPIPE as a missing-token failure.
+  for _ in $(seq 1 5000); do
+    printf '%s\n' '// deterministic inert evidence padding 0123456789' >> "$TREE/bin/descriptor-reader"
+    printf '%s\n' '// deterministic inert test padding 0123456789' >> "$TREE/tests/state.test.js"
+  done
+  chmod +x "$TREE/bin/descriptor-reader"
+
+  for _ in $(seq 1 20); do
+    run_tree_gate c41-omarchy-state-file-hygiene.sh
+    [ "$(sev)" = "PASS" ]
+  done
+}
+
 @test "c41 excludes isolated e2e fixture hooks from shipped runtime" {
   mkdir -p "$TREE/e2e"
   cat > "$TREE/e2e/rig-before-shell.sh" <<'EOF'
