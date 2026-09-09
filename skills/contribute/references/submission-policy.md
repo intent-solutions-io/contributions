@@ -131,7 +131,7 @@ The dedicated gates cover prose voice, private names, Markdown rendering, QML
 text safety, validator results, command injection, runtime dependencies, layout
 overflow, rig evidence, SSRF destination policy, state-file hygiene, bounded
 resource use, and marketplace presentation. The scripts beneath
-`scripts/gates/c28-*` through `c43-*` are authoritative for exact checks.
+`scripts/gates/c28-*` through `c44-*` are authoritative for exact checks.
 
 Deterministic gates do not replace judgment about product taste, unnecessary
 configuration, dead-code altitude, or AI-sounding copy. Review those separately.
