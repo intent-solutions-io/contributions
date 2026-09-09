@@ -1,153 +1,112 @@
-# Workflow Guide — long-form
+# Current Contribution Workflow
 
-## Table of Contents
+This guide expands the control flow in `SKILL.md`. The current system is
+markdown-only. Do not reintroduce the deleted SQLite tracker, bounty tables,
+dashboard application, cloud backend, or separate CLI.
 
-1. [Daily rhythm](#daily-rhythm)
-2. [The 5-step workflow in depth](#the-5-step-workflow-in-depth)
-3. [Project-specific gotchas](#project-specific-gotchas)
-4. [Tracker hygiene](#tracker-hygiene)
-5. [Money & payment programs](#money--payment-programs)
+## State model
 
----
+GitHub owns live issue and PR facts. Local state adds judgment and continuity:
 
-## Daily rhythm
+- Candidate frontmatter stores repo, issue number, status, score, dossier path,
+  scope intent, and optional PR coordinates.
+- Candidate bodies store scope notes, drafts, evidence, and decision history.
+- Dossier frontmatter stores gate inputs and first-touch fit signals.
+- Dossier bodies store rejection patterns, maintainer preferences, deliberate
+  design choices, and a failure log.
+- `log.jsonl` records scout, researcher, transition, gate, and override events.
 
-The first thing the skill does on invoke is Step 0 (refresh state). After that, the natural conversation follows whatever the user is actually trying to do — review status, scout new work, qualify a candidate, draft a submission. The 5-step DISCOVER → QUALIFY → CLAIM → WORK → SUBMIT framing is the long form; most days touch only one or two steps.
+See `candidate-file-format.md` for the canonical file contract.
 
-| Time of day | Typical action |
-|-------------|----------------|
-| Morning | Step 0 (state summary) → reconcile any drift |
-| Mid-morning | Step 1 (discover) if queue is thin |
-| Workblocks | Step 4 (work) on whatever's claimed |
-| End of day | Step 5 (draft submission) for tomorrow's review |
+## Lifecycle
 
-## The 5-step workflow in depth
+### Discover
 
-### 1. DISCOVER — finding paid issues
+Read the existing `open` and `shortlist` candidates first. Use the scout only
+when refreshing that queue or answering a bounded search request. The scout
+writes results; the parent reads its files and presents the strongest choices.
 
-Three sources, in priority order:
+Discovery is not permission to claim. It produces candidates for qualification.
 
-**Tracker (already-curated)** — `bounties` table rows where status is `open`, `qualified`, or `drafting`. These have already passed a competition / staleness check and represent the user's vetted queue.
+### Qualify
 
-**Live GitHub label search** — anything labeled `bounty`, `💰 Bounty`, or repo-specific bounty labels in the tracked orgs. New every day; needs qualifying before it's actionable.
+Confirm the issue is open, unassigned or available under maintainer rules, not
+already solved, and not covered by competing active PRs. Read the dossier's
+collaboration posture, rejection patterns, local test fit, license fence, and
+positioning risk.
 
-**Algora boards** — browse-only via web. Their public API needs auth and the rate limits make it not worth scripting. The boards to know:
+Use three verdicts:
 
-| Org | Stack | Reward range |
-|-----|-------|--------------|
-| mediar-ai (screenpipe) | Rust + TS/Bun | $25–500 |
-| tscircuit | React/PCB | $25–150 |
-| golemcloud | Rust/WASM | up to $3.5K |
-| calcom | TS/Next.js | $20–500 |
-| twentyhq | TS | varies |
-| formbricks | TS | varies |
-| trigger-dev | TS | varies |
+- `claim`: receivable, testable, appropriately scoped, and no live conflict
+- `wait`: a specific external condition could change the answer
+- `skip`: structurally poor fit, duplicated, prohibited, or unverifiable
 
-**Gumroad** — single tracking issue at `antiwork/gumroad#1055`. Lists all active SCSS-to-Tailwind file conversions. $1.5K per file.
+Record decisive evidence rather than a generic score alone.
 
-### 2. QUALIFY — eligibility + competition + responsiveness
+### Claim
 
-Three things to check, fast:
+Run the shortlist-to-claimed gates before showing a draft. Use the claim
+template and match upstream tone. The user must approve before a GitHub comment
+or Wasteland claim is sent.
 
-**Competition** — `gh pr list --repo <owner>/<repo> --search "<issue#>" --state=all`. If 2+ open PRs already, skip. If one open PR is stale (>14 days no activity), the issue may free up — note and revisit.
+After a successful approved claim, let `transition.sh` update candidate status
+atomically. Do not hand-edit a second tracker.
 
-**Maintainer responsiveness** — `gh api repos/<owner>/<repo>/commits` for recent activity dates. No commit in 60 days = likely abandoned. Avg PR merge lag from `gh pr list --state=closed --limit 10 --json mergedAt,createdAt` gives a sense of how long submissions sit.
+### Work
 
-**Friction** — does the repo require a CLA? Does CONTRIBUTING.md ask for design docs / RFCs before code? Is there a PR template that asks for AI disclosure? All of these are fine, but they affect the time-to-merge math.
+Read the clone's instructions, branch from the documented base, stay inside the
+agreed scope, and run the actual native checks. If the repository is
+full-stack-only and the environment cannot be reproduced, choose an isolatable
+fix with honest isolated evidence or do not contribute.
 
-### 3. CLAIM — staking the work
+Do not push failing work merely to let upstream CI diagnose it. Do not rewrite
+history or force-push unless the upstream explicitly requires it and the user
+authorizes it.
 
-Most upstreams accept a plain comment ("hey, I'd like to take this on, plan is X, ETA Y"). Algora-managed issues use Algora's `/bounty` slash command on the issue itself. Some programs (Cortex specifically) require an AI disclosure phrase in the first comment.
+### Submit
 
-After posting, update the tracker so Step 0 reflects the claim. Forgetting this is the #1 source of tracker drift.
+Artifact choice follows collaboration posture, not a universal Design Issue
+rule. Run the working-to-submitted gates, apply the trust ladder, and prepare
+the exact title and body. Human approval is mandatory before creating an issue,
+PR, review, or comment.
 
-### 4. WORK — actually doing the thing
+After an approved PR opens, write its number and URL into the candidate and log
+the event. For Wasteland, record completion with `wl done` only after the PR URL
+exists and the user approved the operation.
 
-Work happens in the upstream clone under `~/000-projects/contributing-clanker/<repo>/`. Each clone has its own `CLAUDE.md` with stack-specific commands and conventions.
+## Dossier freshness
 
-The two non-obvious rules:
+Build a dossier before first touch. Refresh it when older than 14 days or when
+any required field is absent. A manual failure log and curated notes must
+survive refresh.
 
-- **Don't push to forks until tests pass locally.** Pushing then force-pushing is noisy and wastes CI cycles.
-- **Match the upstream's tone.** screenpipe is lowercase; calcom is sentence case; PostHog is sentence case ("Product analytics" not "Product Analytics"). The maintainer notices.
+The researcher, not the parent, performs verbose CONTRIBUTING and linked-policy
+research. The parent consumes its concise result and current dossier.
 
-### 5. SUBMIT — design issue first, PR after approval
+## Gate behavior
 
-The repo's `CLAUDE.md` says it explicitly: auto-opening PRs creates whack-a-mole slopfests. Open a Design Issue with diff preview + test results, wait for the maintainer to approve the approach, *then* open a PR.
+Transitions run deterministic phase gates from `scripts/gates/`. A block stops
+the transition. A warning must be surfaced. An override is allowed only after
+the user names the gate and supplies a concrete reason; the event log makes
+override frequency auditable.
 
-The exception: if the upstream's CONTRIBUTING.md explicitly asks for direct PRs (some repos prefer this for small fixes), follow their convention.
+Never alter a gate, dossier fact, or candidate field merely to manufacture a
+pass. Fix the underlying condition or preserve the block.
 
-## Project-specific gotchas
+## Reconciliation
 
-### screenpipe
+For every candidate with a PR number, compare local state with `gh pr view`:
 
-- Two test suites: `cargo test` for the Rust core, `bun test` for the Tauri app. Both must pass.
-- Lowercase logging and UI text — match the existing codebase tone.
-- No toast errors — use empty states / skeletons / inline errors instead.
-- `@ts-ignore` comments are intentional; don't remove them.
-- Escape HTML properly in JSX (`&apos;` etc. inside string attributes).
+- merged PR: set candidate status to `merged`
+- closed unmerged PR: set status to `dropped` and append the lesson to the
+  dossier failure log
+- open PR: retain `submitted`
 
-### cortex
+Report exact changes and unresolved API failures. GitHub remains authoritative.
 
-- CLA required before first PR — sign at the link in `cortex/CLA.md`.
-- Demo video required (before/after for bugs, feature demo for new work).
-- AI disclosure phrase required in the PR body.
-- Tests with >80% coverage (their bar, not optional).
-- No force-push — merge commits only.
+## Deprecated architecture
 
-### posthog
-
-- ALWAYS wrap commands in `flox activate -- bash -c "..."`. Running pytest directly will fail.
-- Type hints required in Python.
-- No mypy (they ditched it for being too slow).
-- Tailwind preferred over inline styles.
-- Avoid direct `dayjs` imports — use `lib/dayjs`.
-- Conventional commits: `feat(scope):`, `fix(scope):`, lowercase, no period.
-
-### calcom / cal-com
-
-- Two clones in the workspace. Prefer `calcom/` (newer).
-- yarn workspaces — run from the monorepo root, not subpackage.
-
-### vertex-ai-samples (Google)
-
-- CLA required at https://cla.developers.google.com/
-- One notebook per PR.
-- Lint via Docker: `docker run -v ${PWD}:/setup/app gcr.io/cloud-devrel-public-resources/notebook_linter:latest <notebook>.ipynb`
-
-### zio-blocks
-
-- Scala 3, pure FP, sbt.
-- `sbt scalafmtCheckAll` is part of the gate.
-- Schema migrations have $2-4K rewards — biggest individual paydays in the workspace.
-
-### feishin
-
-- Electron + React + pnpm.
-- ESLint + Stylelint both run.
-
-### gumroad
-
-- $1,500 per SCSS file converted to Tailwind.
-- Email `bounties@antiwork.com` with PR link + payment email after merge.
-- Stripe payout (bank, PayPal, crypto).
-- Issue `#1055` is the index of available files.
-
-## Tracker hygiene
-
-The tracker only stays useful if its status reflects reality. Two operations keep it honest:
-
-**Reconcile** — for every row with a `pr_number`, check the live PR state via `gh pr view`. Update the row's `status` to `completed` (merged), `cancelled` (closed-not-merged), or `submitted` (open). Do this at least weekly, or after any "mass push" day.
-
-**Re-import from CSV** — the canonical CSV at `~/000-projects/contributing-clanker/000-docs/002-PM-BKLG-contribution-tracker.csv` is the human-edited backlog. If the CSV gets new rows (manual additions), re-run the importer to land them in SQLite. Idempotent — existing IDs are skipped.
-
-## Money & payment programs
-
-| Program | Payment mechanism | Speed |
-|---------|------------------|-------|
-| Algora | Platform handles automatically (120+ countries) | Days |
-| Gumroad | Email `bounties@antiwork.com` post-merge, Stripe payout | ~1 week |
-| Cortex | Bitcoin (preferred), USDC, or PayPal | <48 hours |
-| Tscircuit / Golem / others on Algora | Same as Algora | Days |
-| Ad-hoc GitHub bounty (no platform) | Negotiated case-by-case | Variable |
-
-The local `001-BL-TRCK-payment-tracker.md` doc tracks paid vs pending across all programs. After a payment lands, update both that doc AND the `bounties.payment_status` column.
+Historical versions used a SQLite database, a `contribute-system` monorepo,
+bounty and payment tables, a web dashboard, and a separate CLI. Those systems
+were removed because the operational path did not use them. The current skill
+must not claim they exist or direct users to SQL updates.
